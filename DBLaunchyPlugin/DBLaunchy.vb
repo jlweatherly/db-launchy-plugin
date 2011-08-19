@@ -25,7 +25,6 @@ Public Class DBLaunchy
 
     Private dtApps As DataTable
 
-
 #Region "Plugin Methods"
     Public Sub init(ByVal pluginHost As IPluginHost) Implements IPlugin.init
         m_pluginhost = pluginHost
@@ -225,7 +224,6 @@ Public Class DBLaunchy
     End Sub
     Private Sub FillApps()
         dtApps = New DataTable
-        dtAuthority = New DataTable
 
         Dim cnnString As String = String.Format("server = {0}; database = {1}; UID = {2} ; pwd = {3};", _
             m_Server, m_DB, m_User, m_Pass)
@@ -234,8 +232,6 @@ Public Class DBLaunchy
         Dim cmd As SqlCommand = New SqlCommand(m_SQLCommand)
         cmd.CommandType = CommandType.StoredProcedure
         cmd.Connection = cnn
-
-        cmd.Parameters.AddWithValue("@cAuthority", "")
 
         Try
             cnn.Open()
