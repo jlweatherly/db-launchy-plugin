@@ -24,9 +24,9 @@ Public Class DBLaunchy
     Private m_optionsWidget As OptionsWidget = New OptionsWidget
 
     Private dtApps As DataTable
-    Private dtAuthority As DataTable
 
 
+#Region "Plugin Methods"
     Public Sub init(ByVal pluginHost As IPluginHost) Implements IPlugin.init
         m_pluginhost = pluginHost
 
@@ -50,6 +50,124 @@ Public Class DBLaunchy
         End If
 
     End Sub
+
+    Public Function getID() As UInteger Implements IPlugin.getID
+        Return m_id
+    End Function
+    Public Function getName() As String Implements IPlugin.getName
+        Return m_name
+    End Function
+    Public Function getIcon() As String
+        Return m_iconpath
+    End Function
+
+    Public Sub getCatalog(ByVal catalogItems As List(Of ICatItem)) Implements IPlugin.getCatalog
+
+    End Sub
+    Public Sub getLabels(ByVal inputDataList As List(Of IInputData)) Implements IPlugin.getLabels
+
+    End Sub
+
+    Public Sub getResults(ByVal inputDataList As List(Of IInputData), ByVal resultsList As List(Of ICatItem)) Implements IPlugin.getResults
+
+        Dim appToMatch As String = inputDataList(0).getText()
+
+        If (appToMatch = "") Then
+            Return
+        End If
+
+        appToMatch = appToMatch.Replace(" ", "%") ' make the spaces wildcards
+
+        Dim drMatchingApps() As DataRow = dtApps.Select("cTitle LIKE '%" & appToMatch & "%'")
+
+        For Each dr As DataRow In drMatchingApps
+            Dim shortName As String = CStr(dr!cTitle).Trim
+            Dim fullPath As String = ""
+            fullPath = CStr(dr!cDirectory).Trim & "\" & CStr(dr!cProgram).Trim
+
+            Dim result As ICatItem = m_catItemFactory.createCatItem(fullPath, _
+                shortName, getID(), getIcon())
+
+            If Not resultsList.Contains(result) Then
+                resultsList.Add(result)
+            End If
+
+        Next
+
+    End Sub
+
+    Public Sub launchItem(ByVal inputDataList As List(Of IInputData), ByVal item As ICatItem) Implements IPlugin.launchItem
+
+        Dim catItem As ICatItem = inputDataList(inputDataList.Count - 1).getTopResult
+
+        Try
+            'get path to run
+            Dim cFullPath As String = catItem.getFullPath.Replace("\\", "\") '' remove dupe \'s 
+
+            Dim exeDelim As String() = New String(1) {".exe", ".EXE"}
+            Dim strCommand() As String = cFullPath.Split(exeDelim, StringSplitOptions.None)
+
+            Dim cmd As String = strCommand(0) & ".exe"
+            Dim params As String = ""
+
+            If strCommand.Length = 2 Then
+                'parameters included after exe
+                params = strCommand(1)
+            End If
+
+            'and run it
+            Dim psi As New System.Diagnostics.ProcessStartInfo(cmd, params)
+            psi.UseShellExecute = False
+            System.Diagnostics.Process.Start(psi)
+
+
+        Catch ex As Exception
+            'don't catch any exceptions for now..
+        End Try
+
+
+    End Sub
+
+    Public Function hasDialog() As Boolean Implements IPlugin.hasDialog
+        Return True
+    End Function
+
+    Public Function doDialog() As System.IntPtr Implements IPlugin.doDialog
+        m_optionsWidget.User = m_User
+        m_optionsWidget.Password = m_Pass
+        m_optionsWidget.Server = m_Server
+        m_optionsWidget.DB = m_DB
+        m_optionsWidget.SQLCommand = m_SQLCommand
+
+        m_optionsWidget.Show()
+        Return m_optionsWidget.Handle
+
+    End Function
+
+    Public Sub endDialog(ByVal acceptedByUser As Boolean) Implements IPlugin.endDialog
+        If acceptedByUser Then
+            m_User = m_optionsWidget.User
+            m_Pass = m_optionsWidget.Password
+            m_Server = m_optionsWidget.Server
+            m_DB = m_optionsWidget.DB
+            m_SQLCommand = m_optionsWidget.SQLCommand
+
+            WriteINI(m_iniPath)
+
+        End If
+
+    End Sub
+
+    Public Sub launchyHide() Implements IPlugin.launchyHide
+
+    End Sub
+
+    Public Sub launchyShow() Implements IPlugin.launchyShow
+
+    End Sub
+
+#End Region
+
     Private Sub ReadINI(ByVal file As String)
         Try
             If IO.File.Exists(file) Then
@@ -117,6 +235,8 @@ Public Class DBLaunchy
         cmd.CommandType = CommandType.StoredProcedure
         cmd.Connection = cnn
 
+        cmd.Parameters.AddWithValue("@cAuthority", "")
+
         Try
             cnn.Open()
             Dim da As SqlDataAdapter = New SqlDataAdapter(cmd)
@@ -130,129 +250,5 @@ Public Class DBLaunchy
 
     End Sub
 
-    Public Function getID() As UInteger Implements IPlugin.getID
-        Return m_id
-    End Function
-    Public Function getName() As String Implements IPlugin.getName
-        Return m_name
-    End Function
-    Public Function getIcon() As String
-        Return m_iconpath
-    End Function
-
-    Public Sub getCatalog(ByVal catalogItems As List(Of ICatItem)) Implements IPlugin.getCatalog
-
-    End Sub
-    Public Sub getLabels(ByVal inputDataList As List(Of IInputData)) Implements IPlugin.getLabels
-
-    End Sub
-
-
-    Public Sub getResults(ByVal inputDataList As List(Of IInputData), ByVal resultsList As List(Of ICatItem)) Implements IPlugin.getResults
-
-        Dim appToMatch As String = inputDataList(0).getText()
-
-        If (appToMatch = "") Then
-            Return
-        End If
-
-        appToMatch = appToMatch.Replace(" ", "%") ' make the spaces wildcards
-
-        Dim drMatchingApps() As DataRow = dtApps.Select("cTitle LIKE '%" & appToMatch & "%'")
-
-        For Each dr As DataRow In drMatchingApps
-            Dim shortName As String = CStr(dr!cTitle).Trim
-            Dim fullPath As String = ""
-            fullPath = CStr(dr!cDirectory).Trim & "\" & CStr(dr!cProgram).Trim
-
-            Dim result As ICatItem = m_catItemFactory.createCatItem(fullPath, _
-                shortName, getID(), getIcon())
-
-            If Not resultsList.Contains(result) Then
-                resultsList.Add(result)
-            End If
-
-        Next
-
-    End Sub
-
-
-    Public Sub launchItem(ByVal inputDataList As List(Of IInputData), ByVal item As ICatItem) Implements IPlugin.launchItem
-
-        Dim catItem As ICatItem = inputDataList(inputDataList.Count - 1).getTopResult
-
-        Try
-            'get path to run
-            Dim cFullPath As String = catItem.getFullPath.Replace("\\", "\")
-            cFullPath = cFullPath.Replace(".exe", ".exe") ' make all exe's lowercase, but leave the rest of the string alone
-
-            Dim exeDelim As String() = New String(1) {".exe", ".EXE"}
-            Dim strCommand() As String = cFullPath.Split(exeDelim, StringSplitOptions.None)
-
-            'and run it
-            If strCommand.Length = 1 Then
-                'no parameters
-                RunProgram(strCommand(0) & ".exe", "")
-            Else
-                'does have parameters, use them
-                RunProgram(strCommand(0) & ".exe", strCommand(1))
-            End If
-
-        Catch ex As Exception
-            'don't catch any exceptions for now..
-        End Try
-
-
-    End Sub
-
-    Public Function hasDialog() As Boolean Implements IPlugin.hasDialog
-        Return True
-    End Function
-
-    Public Function doDialog() As System.IntPtr Implements IPlugin.doDialog
-        m_optionsWidget.User = m_User
-        m_optionsWidget.Password = m_Pass
-        m_optionsWidget.Server = m_Server
-        m_optionsWidget.DB = m_DB
-        m_optionsWidget.SQLCommand = m_SQLCommand
-
-        m_optionsWidget.Show()
-        Return m_optionsWidget.Handle
-
-    End Function
-
-    Public Sub endDialog(ByVal acceptedByUser As Boolean) Implements IPlugin.endDialog
-        If acceptedByUser Then
-            m_User = m_optionsWidget.User
-            m_Pass = m_optionsWidget.Password
-            m_Server = m_optionsWidget.Server
-            m_DB = m_optionsWidget.DB
-            m_SQLCommand = m_optionsWidget.SQLCommand
-
-            WriteINI(m_iniPath)
-
-        End If
-
-    End Sub
-
-    Public Sub launchyHide() Implements IPlugin.launchyHide
-
-    End Sub
-
-    Public Sub launchyShow() Implements IPlugin.launchyShow
-
-    End Sub
-
-    Private Function RunProgram(ByVal cmd As String, ByVal parameters As String) As Boolean
-
-        Dim psi As New System.Diagnostics.ProcessStartInfo(cmd, parameters)
-        psi.RedirectStandardError = True
-        psi.RedirectStandardOutput = True
-        psi.UseShellExecute = False
-
-        Dim p As System.Diagnostics.Process = System.Diagnostics.Process.Start(psi)
-
-
-    End Function
 End Class
 
