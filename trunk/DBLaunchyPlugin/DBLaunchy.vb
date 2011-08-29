@@ -116,6 +116,8 @@ Public Class DBLaunchy
 
             'and run it
             Dim psi As New System.Diagnostics.ProcessStartInfo(cmd, params)
+            Dim fi As New IO.FileInfo(cmd)
+            psi.WorkingDirectory = fi.DirectoryName
             psi.UseShellExecute = False
             System.Diagnostics.Process.Start(psi)
 
